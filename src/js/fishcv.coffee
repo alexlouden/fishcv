@@ -68,8 +68,10 @@ class App
     
     @grayscale()
     @equalize_histogram()
-
     @blur_image(5)
+
+    @detect_edges()
+        
     @render()
 
   grayscale: =>
@@ -82,6 +84,12 @@ class App
     kernel_size = (blur_radius + 1) << 1
     sigma = 0
     jsfeat.imgproc.gaussian_blur @img_u8, @img_u8, kernel_size, sigma
+
+  detect_edges: =>
+    low_threshold = 40
+    high_threshold = 80
+    jsfeat.imgproc.canny @img_u8, @img_u8,
+      low_threshold, high_threshold
 
   render: =>
     # draw data to canvas
