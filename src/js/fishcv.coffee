@@ -64,26 +64,35 @@ class App
       return
 
     @ctx.drawImage @video, 0, 0, 640, 480
-    imageData = @ctx.getImageData(0, 0, 640, 480)
-      
-    jsfeat.imgproc.grayscale imageData.data, @img_u8.data
+    @imageData = @ctx.getImageData(0, 0, 640, 480)
     
-    blur_radius = 5
-    kernel_size = (blur_radius + 1) << 1
-    sigma = 1
+    @grayscale()
+    @equalize_histogram()
 
+    @blur_image(5)
+    @render()
+
+  grayscale: =>
+    jsfeat.imgproc.grayscale @imageData.data, @img_u8.data
+
+  equalize_histogram: =>
+    jsfeat.imgproc.equalize_histogram @img_u8.data, @img_u8.data
+
+  blur_image: (blur_radius) =>
+    kernel_size = (blur_radius + 1) << 1
+    sigma = 0
     jsfeat.imgproc.gaussian_blur @img_u8, @img_u8, kernel_size, sigma
 
-    # render result back to canvas
-    data_u32 = new Uint32Array(imageData.data.buffer)
+  render: =>
+    # draw data to canvas
+    data_u32 = new Uint32Array(@imageData.data.buffer)
     alpha = (0xff << 24)
     i = @img_u8.cols * @img_u8.rows
     pix = 0
     while --i >= 0
       pix = @img_u8.data[i]
       data_u32[i] = alpha | (pix << 16) | (pix << 8) | pix
-    @ctx.putImageData imageData, 0, 0
-
+    @ctx.putImageData @imageData, 0, 0
 
 $ ->
   window.app = new App()
