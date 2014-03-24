@@ -1,8 +1,3 @@
-#### spacetriangle
+#### fishCV
 
-[![Stories in Ready](https://badge.waffle.io/alexlouden/spacetriangle.png)](http://waffle.io/alexlouden/spacetriangle)
-
-A simple space browser-based game. 
-
-Built using kineticjs in coffeescript by alexlouden and calumroy.  
-Developed using grunt. 
+An interactive art projection using computer vision, boids and d3 for SVG
