@@ -21,7 +21,7 @@ class App
     @video = $('#webcam')[0]
     @canvas = $('canvas')[0]
 
-    @img_u8 = new jsfeat.matrix_t(640, 480, jsfeat.U8_t | jsfeat.C1_t)
+    @imageData = new jsfeat.matrix_t(640, 480, jsfeat.U8_t | jsfeat.C1_t)
 
     compatibility.getUserMedia video: true, @handleVideo
 
@@ -46,14 +46,29 @@ class App
     return
 
   doFish: ->
-    canvasWidth = @canvas.width
-    canvasHeight = @canvas.height
+
     @ctx = @canvas.getContext("2d")
     @ctx.fillStyle = "rgb(0,255,0)"
     @ctx.strokeStyle = "rgb(0,255,0)"
 
-    img_pyr = new jsfeat.pyramid_t(4)
-    img_pyr.allocate 640, 480, jsfeat.U8_t | jsfeat.C1_t
+    @curr_img_pyr = new jsfeat.pyramid_t(3)
+    @prev_img_pyr = new jsfeat.pyramid_t(3)
+    @curr_img_pyr.allocate 640, 480, jsfeat.U8_t | jsfeat.C1_t
+    @prev_img_pyr.allocate 640, 480, jsfeat.U8_t | jsfeat.C1_t
+
+    @point_count = 0
+    @point_status = new Uint8Array(100)
+    @prev_xy = new Float32Array(100 * 2)
+    @curr_xy = new Float32Array(100 * 2)
+
+    @options =
+      win_size: 20
+      max_iterations: 30
+      epsilon: 0.01
+      min_eigen: 0.001
+
+    # set up continuous grid of tracking points
+    setInterval window.app.add_tracking_points, 1000
 
     return
   
@@ -66,41 +81,104 @@ class App
     @ctx.drawImage @video, 0, 0, 640, 480
     @imageData = @ctx.getImageData(0, 0, 640, 480)
     
+    # @blur_image(5)
+    # @detect_edges()
+
+    # swap flow data
+    [@prev_xy, @curr_xy] = [@curr_xy, @prev_xy]
+    [@prev_img_pyr, @curr_img_pyr] = [@curr_img_pyr, @prev_img_pyr]
+
     @grayscale()
     @equalize_histogram()
-    @blur_image(5)
 
-    @detect_edges()
-        
-    @render()
+    # @render()
+    @optical_flow()
 
-  grayscale: =>
-    jsfeat.imgproc.grayscale @imageData.data, @img_u8.data
+  grayscale: ->
+    jsfeat.imgproc.grayscale @imageData.data, @curr_img_pyr.data[0].data
 
-  equalize_histogram: =>
-    jsfeat.imgproc.equalize_histogram @img_u8.data, @img_u8.data
+  equalize_histogram: ->
+    jsfeat.imgproc.equalize_histogram(
+      @curr_img_pyr.data[0].data, @curr_img_pyr.data[0].data
+    )
 
-  blur_image: (blur_radius) =>
-    kernel_size = (blur_radius + 1) << 1
-    sigma = 0
-    jsfeat.imgproc.gaussian_blur @img_u8, @img_u8, kernel_size, sigma
+  add_tracking_points: =>
 
-  detect_edges: =>
-    low_threshold = 40
-    high_threshold = 80
-    jsfeat.imgproc.canny @img_u8, @img_u8,
-      low_threshold, high_threshold
+    if @point_count > 50
+      return
 
-  render: =>
-    # draw data to canvas
-    data_u32 = new Uint32Array(@imageData.data.buffer)
-    alpha = (0xff << 24)
-    i = @img_u8.cols * @img_u8.rows
-    pix = 0
-    while --i >= 0
-      pix = @img_u8.data[i]
-      data_u32[i] = alpha | (pix << 16) | (pix << 8) | pix
-    @ctx.putImageData @imageData, 0, 0
+    canvasWidth = @canvas.width
+    canvasHeight = @canvas.height
+    for x in [0..10]
+      for y in [0..10]
+        @add_tracking_point(canvasWidth/10*x, canvasWidth/10*y)
+
+    return
+
+  add_tracking_point: (x, y) ->
+
+    @curr_xy[@point_count<<1] = x
+    @curr_xy[(@point_count<<1)+1] = y
+
+    @point_count++
+
+  optical_flow: ->
+    @curr_img_pyr.build @curr_img_pyr.data[0], true
+
+    jsfeat.optical_flow_lk.track(
+      @prev_img_pyr, @curr_img_pyr,
+      @prev_xy, @curr_xy,
+      @point_count,
+      @options.win_size, @options.max_iterations,
+      @point_status, @options.epsilon, @options.min_eigen
+    )
+
+    @prune_oflow_points()
+
+  # blur_image: (blur_radius) =>
+  #   kernel_size = (blur_radius + 1) << 1
+  #   sigma = 0
+  #   jsfeat.imgproc.gaussian_blur @curr_img_pyr, @curr_img_pyr,
+  # kernel_size, sigma
+
+  # detect_edges: =>
+  #   low_threshold = 40
+  #   high_threshold = 80
+  #   jsfeat.imgproc.canny @imageData, @imageData,
+  #     low_threshold, high_threshold
+
+  prune_oflow_points: ->
+    # ugh
+    n = @point_count
+    i = 0
+    j = 0
+    while i < n
+      if @point_status[i] is 1
+        if j < i
+          @curr_xy[j << 1] = @curr_xy[i << 1]
+          @curr_xy[(j << 1) + 1] = @curr_xy[(i << 1) + 1]
+        @draw_circle @curr_xy[j << 1], @curr_xy[(j << 1) + 1]
+        ++j
+      ++i
+    @point_count = j
+    return
+
+  draw_circle: (x, y) ->
+    @ctx.beginPath()
+    @ctx.arc x, y, 4, 0, Math.PI * 2, true
+    @ctx.closePath()
+    @ctx.fill()
+
+  # render: =>
+  #   # draw data to canvas
+  #   data_u32 = new Uint32Array(@imageData.data.buffer)
+  #   alpha = (0xff << 24)
+  #   i = @curr_img_pyr.cols * @curr_img_pyr.rows
+  #   pix = 0
+  #   while --i >= 0
+  #     pix = @curr_img_pyr.data[i]
+  #     data_u32[i] = alpha | (pix << 16) | (pix << 8) | pix
+  #   @ctx.putImageData @imageData, 0, 0
 
 $ ->
   window.app = new App()
