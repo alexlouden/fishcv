@@ -67,9 +67,6 @@ class App
       epsilon: 0.01
       min_eigen: 0.001
 
-    # set up continuous grid of tracking points
-    setInterval window.app.add_tracking_points, 1000
-
     return
   
   tick: =>
@@ -134,6 +131,7 @@ class App
     )
 
     @prune_oflow_points()
+    @add_tracking_points()
 
   # blur_image: (blur_radius) =>
   #   kernel_size = (blur_radius + 1) << 1
