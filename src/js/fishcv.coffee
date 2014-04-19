@@ -22,6 +22,7 @@ class App
     @canvas = $('canvas')[0]
 
     @imageData = new jsfeat.matrix_t(640, 480, jsfeat.U8_t | jsfeat.C1_t)
+    @swarm = new Swarm(20, @canvas.width, @canvas.height)
 
     compatibility.getUserMedia video: true, @handleVideo
 
@@ -87,6 +88,9 @@ class App
 
     @grayscale()
     @equalize_histogram()
+
+    @draw_boids()
+    @swarm.update_boids()
 
     # @render()
     @optical_flow()
@@ -166,6 +170,19 @@ class App
     @ctx.arc x, y, 4, 0, Math.PI * 2, true
     @ctx.closePath()
     @ctx.fill()
+
+  draw_boids: ->
+    console.log "Boids!"
+    @ctx.fillStyle = "rgb(255,0,0)"
+    @ctx.strokeStyle = "rgb(255,0,0)"
+    for i in [0 .. @swarm.size - 1] by 1
+      x = @swarm.boids[i << 1]
+      y = @swarm.boids[(i << 1) + 1]
+      @draw_circle x, y
+
+    @ctx.fillStyle = "rgb(0,255,0)"
+    @ctx.strokeStyle = "rgb(0,255,0)"
+    return
 
   # render: =>
   #   # draw data to canvas
