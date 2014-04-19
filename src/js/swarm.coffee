@@ -20,9 +20,9 @@ class Swarm
 
     return
 
-  distanceBetween: (x1, y1, x2, y2) ->
-    n = (x1 - x2) * (x1 - x2) +
-      (y1 - y2) * (y1 - y2)
+  distanceBetween: (p1, p2) ->
+    n = (p1[0] - p2[0]) * (p1[0] - p2[0]) +
+      (p1[1] - p2[1]) * (p1[1] - p2[1])
     return Math.sqrt(n)
 
   getMagnitude: (vector) ->
@@ -33,11 +33,49 @@ class Swarm
   # Updates position and velocities of all the boids.
   update_boids: ->
     for b in [0 .. @size - 1] by 1
+      boidPosition = [@boids[b << 1], @boids[(b << 1) + 1]]
+      boidVelocity = [@boids_velocity[b << 1], @boids_velocity[(b << 1) + 1]]
+      sumPositions = [0, 0]
+      sumVelocities = [0, 0]
+      sumDifferences = [0, 0]
+
+      for other in [0 .. @size - 1] by 1 when other isnt b
+
+        otherPosition = [@boids[other << 1], @boids[(other << 1) + 1]]
+        otherVelocity =
+          [@boids_velocity[other << 1], @boids_velocity[(other << 1) + 1]]
+
+        sumPositions[0] += otherPosition[0]
+        sumPositions[1] += otherPosition[1]
+
+        sumVelocities[0] += otherVelocity[0]
+        sumVelocities[1] += otherVelocity[1]
+
+        if @distanceBetween(boidPosition, otherPosition) < @REPEL_RADIUS
+          sumDifferences[0] -= (otherPosition[0] - boidPosition[0])
+          sumDifferences[1] -= (otherPosition[1] - boidPosition[1])
+
       forces = []
-      forces.push(@move_to_centre(b))
-      forces.push(@repel_other(b))
-      forces.push(@match_nearby(b))
-      forces.push(@tend_to_point(b, [600, 500]))
+      # vector giving tendancy for the fish to group together
+      center = (n / (@size - 1) for n in sumPositions)
+      toCenter =
+        [(center[0] - boidPosition[0]) / @INV_CENTRE_INFLUENCE,
+        (center[1] - boidPosition[1]) / @INV_CENTRE_INFLUENCE]
+      forces.push(toCenter)
+
+      # vector for tendency for fish not to run into each other
+      forces.push(sumDifferences)
+
+      # fish will try to match the velocity of fish around them
+      averageVelocity = (n / (@size - 1) for n in sumVelocities)
+      averageVelocity =
+        [averageVelocity[0] - boidVelocity[0],
+        averageVelocity[1] - boidVelocity[1]]
+      match = (n / @INV_MATCH_INFLUENCE for n in averageVelocity)
+      forces.push(match)
+
+      # fish will tend towards a point
+      forces.push(@tend_to_point(b, [200, 200]))
       
       # Sum the force vectors
       f = [0, 0]
@@ -55,59 +93,6 @@ class Swarm
       @boids[p + 1] += @boids_velocity[p + 1]
 
     return
-
-  # Adds a tendancy for boids to fly towards the centre of the group
-  move_to_centre: (boid) ->
-    # finding centre
-    x = 0
-    y = 0
-
-    for i in [0 .. @size - 1] by 1 when i isnt boid
-      x += @boids[i << 1]
-      y += @boids[(i << 1) + 1]
-
-    x = x / (@size - 1)
-    y = y / (@size - 1)
-
-    bX = @boids[boid << 1]
-    bY = @boids[(boid << 1) + 1]
-
-    diff = [(x - bX) / @INV_CENTRE_INFLUENCE, (y - bY) / @INV_CENTRE_INFLUENCE]
-
-    return diff
-
-  # Tendancy for boids to keep seperated a little
-  repel_other: (boid) ->
-    res = [0, 0]
-    bX = @boids[boid << 1]
-    bY = @boids[(boid << 1) + 1]
-
-    for b in [0 .. @size - 1] by 1 when b isnt boid
-      x = @boids[b << 1]
-      y = @boids[(b << 1) + 1]
-
-      if @distanceBetween(bX, bY, x, y) < @REPEL_RADIUS
-        res[0] -= (x - bX)
-        res[1] -= (y - bY)
-
-    return res
-
-  # Boids will try to match the velocity of those boids around them
-  match_nearby: (boid) ->
-    v = [0, 0]
-
-    for b in [0 .. @size - 1] by 1 when b isnt boid
-      v[0] += @boids_velocity[boid << 1]
-      v[1] += @boids_velocity[(boid << 1) + 1]
-
-    v[0] = v[0] / (@size - 1)
-    v[1] = v[1] / (@size - 1)
-    v[0] -= @boids[boid << 1]
-    v[1] -= @boids[(boid << 1) + 1]
-
-    v = (n / @INV_MATCH_INFLUENCE for n in v)
-    return v
-
 
   # limits the velocity so that the boids can't go arbitrarily fast.
   limit_velocity: (boid) ->
