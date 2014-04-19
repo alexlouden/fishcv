@@ -1,6 +1,9 @@
 class Swarm
   REPEL_RADIUS: 20
   V_LIM: 5
+  INV_CENTRE_INFLUENCE: 100
+  INV_MATCH_INFLUENCE: 8
+  INV_TEND_TO_INFLUENCE: 10
 
   constructor: (size, width, height) ->
     @size = size
@@ -34,7 +37,7 @@ class Swarm
       forces.push(@move_to_centre(b))
       forces.push(@repel_other(b))
       forces.push(@match_nearby(b))
-      forces.push(@tend_to_point(b, [200, 200]))
+      forces.push(@tend_to_point(b, [600, 500]))
       
       # Sum the force vectors
       f = [0, 0]
@@ -69,7 +72,7 @@ class Swarm
     bX = @boids[boid << 1]
     bY = @boids[(boid << 1) + 1]
 
-    diff = [(x - bX) / 5, (y - bY) / 5]
+    diff = [(x - bX) / @INV_CENTRE_INFLUENCE, (y - bY) / @INV_CENTRE_INFLUENCE]
 
     return diff
 
@@ -87,7 +90,7 @@ class Swarm
         res[0] -= (x - bX)
         res[1] -= (y - bY)
 
-    return (i / 10 for i in res)
+    return res
 
   # Boids will try to match the velocity of those boids around them
   match_nearby: (boid) ->
@@ -102,7 +105,7 @@ class Swarm
     v[0] -= @boids[boid << 1]
     v[1] -= @boids[(boid << 1) + 1]
 
-    v = (n / 100 for n in v)
+    v = (n / @INV_MATCH_INFLUENCE for n in v)
     return v
 
 
@@ -116,8 +119,8 @@ class Swarm
         @boids_velocity[(boid << 1) + 1] / mag * @V_LIM
 
   tend_to_point: (boid,  point) ->
-    b = [@boids[boid << 1], @boids_velocity[(boid << 1) + 1]]
+    b = [@boids[boid << 1], @boids[(boid << 1) + 1]]
     r = []
-    r[0] = (point[0] - b[0]) / 50
-    r[1] = (point[1] - b[1]) / 50
+    r[0] = (point[0] - b[0]) / @INV_TEND_TO_INFLUENCE
+    r[1] = (point[1] - b[1]) / @INV_TEND_TO_INFLUENCE
     return r
