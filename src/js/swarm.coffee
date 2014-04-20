@@ -1,5 +1,5 @@
 class Swarm
-  REPEL_RADIUS: 20
+  REPEL_RADIUS: 40
   V_LIM: 5
   INV_CENTRE_INFLUENCE: 100
   INV_MATCH_INFLUENCE: 8
@@ -9,6 +9,7 @@ class Swarm
     @size = size
     @boids = new Float32Array(size * 2 + 1)
     @boids_velocity = new Float32Array(size * 2 + 1)
+    @focus_point = [200, 200]
     @init_positions width, height
 
   init_positions: (width, height) ->
@@ -29,6 +30,10 @@ class Swarm
     n = vector[0] * vector[0] + vector[1] * vector[1]
     n = Math.sqrt(n)
     return n
+
+  setFocus: (x, y) ->
+    @focus_point[0] = x
+    @focus_point[1] = y
 
   # Updates position and velocities of all the boids.
   update_boids: ->
@@ -75,7 +80,7 @@ class Swarm
       forces.push(match)
 
       # fish will tend towards a point
-      forces.push(@tend_to_point(b, [200, 200]))
+      forces.push(@tend_to_point(b, @focus_point))
       
       # Sum the force vectors
       f = [0, 0]

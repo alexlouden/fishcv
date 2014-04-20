@@ -21,6 +21,10 @@ class App
     @video = $('#webcam')[0]
     @canvas = $('canvas')[0]
 
+    @canvas.addEventListener('click', (e) =>
+      @swarm.setFocus(e.offsetX, e.offsetY)
+    )
+
     @imageData = new jsfeat.matrix_t(640, 480, jsfeat.U8_t | jsfeat.C1_t)
     @swarm = new Swarm(20, @canvas.width, @canvas.height)
 
