@@ -23,7 +23,7 @@ class Swarm
   distanceBetween: (p1, p2) ->
     n = (p1[0] - p2[0]) * (p1[0] - p2[0]) +
       (p1[1] - p2[1]) * (p1[1] - p2[1])
-    return Math.sqrt(n)
+    return n
 
   getMagnitude: (vector) ->
     n = vector[0] * vector[0] + vector[1] * vector[1]
@@ -51,7 +51,7 @@ class Swarm
         sumVelocities[0] += otherVelocity[0]
         sumVelocities[1] += otherVelocity[1]
 
-        if @distanceBetween(boidPosition, otherPosition) < @REPEL_RADIUS
+        if @distanceBetween(boidPosition, otherPosition) < @REPEL_RADIUS * @REPEL_RADIUS
           sumDifferences[0] -= (otherPosition[0] - boidPosition[0])
           sumDifferences[1] -= (otherPosition[1] - boidPosition[1])
 
