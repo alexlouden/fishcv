@@ -26,7 +26,7 @@ class App
     )
 
     @imageData = new jsfeat.matrix_t(640, 480, jsfeat.U8_t | jsfeat.C1_t)
-    @swarm = new Swarm(20, @canvas.width, @canvas.height)
+    @swarm = new Swarm(50, @canvas.width, @canvas.height)
 
     compatibility.getUserMedia video: true, @handleVideo
 
