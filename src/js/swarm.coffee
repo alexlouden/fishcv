@@ -4,12 +4,15 @@ class Swarm
   INV_CENTRE_INFLUENCE: 100
   INV_MATCH_INFLUENCE: 8
   INV_TEND_TO_INFLUENCE: 10
+  GRID_WIDTH: 20
 
   constructor: (size, width, height) ->
     @size = size
     @boids = new Float32Array(size * 2 + 1)
     @boids_velocity = new Float32Array(size * 2 + 1)
     @focus_point = [200, 200]
+    @width = width
+    @height = height
     @init_positions width, height
 
   init_positions: (width, height) ->
@@ -35,16 +38,27 @@ class Swarm
     @focus_point[0] = x
     @focus_point[1] = y
 
+  sweep: ->
+    @sweep_alloc = []
+    for b in [0 .. @size - 1] by 1
+      bin = Math.floor(@boids[b << 1] / @GRID_WIDTH)
+      if not @sweep_alloc[bin]?
+        @sweep_alloc[bin] = []
+      
+      @sweep_alloc[bin].push(b)
+
   # Updates position and velocities of all the boids.
   update_boids: ->
+    @sweep()
     for b in [0 .. @size - 1] by 1
       boidPosition = [@boids[b << 1], @boids[(b << 1) + 1]]
+      bin = Math.floor(boidPosition[0] / @GRID_WIDTH)
       boidVelocity = [@boids_velocity[b << 1], @boids_velocity[(b << 1) + 1]]
       sumPositions = [0, 0]
       sumVelocities = [0, 0]
       sumDifferences = [0, 0]
 
-      for other in [0 .. @size - 1] by 1 when other isnt b
+      for other in @sweep_alloc[bin] by 1 when other isnt b
 
         otherPosition = [@boids[other << 1], @boids[(other << 1) + 1]]
         otherVelocity =
