@@ -6,6 +6,12 @@ module.exports = (grunt) ->
     # Check Coffee
     coffeelint:
       app: ['src/**/*.coffee']
+      options:
+        'no_trailing_whitespace':
+          level: 'warn'
+        'max_line_length':
+          value: 100
+          level: 'warn'
           
     # Coffee -> JS
     coffee:
