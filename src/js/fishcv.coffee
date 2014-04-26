@@ -20,6 +20,7 @@ class App
 
     @video = $('#webcam')[0]
     @canvas = $('canvas')[0]
+    @canvas2 = $('#canvas2')[0]
 
     @img_u8 = new jsfeat.matrix_t(640, 480, jsfeat.U8_t | jsfeat.C1_t)
 
@@ -51,12 +52,16 @@ class App
     @ctx = @canvas.getContext("2d")
     @ctx.fillStyle = "rgb(0,255,0)"
     @ctx.strokeStyle = "rgb(0,255,0)"
+    
+    @ctx2 = @canvas2.getContext("2d")
 
     img_pyr = new jsfeat.pyramid_t(4)
     img_pyr.allocate 640, 480, jsfeat.U8_t | jsfeat.C1_t
 
     @background = new jsfeat.matrix_t(640, 480, jsfeat.U8_t | jsfeat.C1_t)
     @difference = new jsfeat.matrix_t(640, 480, jsfeat.U8_t | jsfeat.C1_t)
+
+    @first = true
 
     return
   
@@ -66,18 +71,28 @@ class App
     if @video.readyState is not @video.HAVE_ENOUGH_DATA
       return
 
+    # video onto canvas
     @ctx.drawImage @video, 0, 0, 640, 480
+    # get canvas colour image
     @imageData = @ctx.getImageData(0, 0, 640, 480)
     
+    # colour image (imagedata) to grey (img_u8)
     @grayscale()
+
     # @equalize_histogram()
     @blur_image(5)
+
+    if @first
+      console.log 'running first'
+      @background.data.set @img_u8.data
+      @first = false
 
     @average_background(@img_u8)
 
     # @detect_edges()
     
-    @render(@difference)
+    @render(@ctx, @background)
+    @render(@ctx2, @difference)
 
   grayscale: =>
     jsfeat.imgproc.grayscale @imageData.data, @img_u8.data
@@ -96,30 +111,31 @@ class App
     cols = src.cols
 
     # how fast background averages
-    bg_f = 0.7
+    bg_f = 0.99
 
     # how fast targets average
-    fg_f = 0.95
+    fg_f = 1
 
     # Difference threshold
-    thresh = 0.1 * 255
+    thresh = 0.05 * 255
 
     for i in [0 .. src.data.length]
       bg_colour = @background.data[i]
       fg_colour = src.data[i]
 
-      if @difference.data[i] <= thresh
-        f = fg_f
-      else
+      if @difference.data[i] == 0
         f = bg_f
+      else
+        # moving areas
+        f = fg_f
 
       @background.data[i] = (bg_colour * f) + (fg_colour * (1 - f))
       
       diff = Math.abs(@background.data[i] - fg_colour)
       if diff > thresh
-        @difference.data[i] = 0
+        @difference.data[i] = 255
       else
-        @difference.data[i] = diff / thresh * 255
+        @difference.data[i] = 0
 
     return
 
@@ -129,7 +145,7 @@ class App
     jsfeat.imgproc.canny @img_u8, @img_u8,
       low_threshold, high_threshold
 
-  render: (src) =>
+  render: (ctx, src) =>
     # draw data to canvas
     data_u32 = new Uint32Array(@imageData.data.buffer)
     alpha = (0xff << 24)
@@ -138,7 +154,7 @@ class App
     while --i >= 0
       pix = src.data[i]
       data_u32[i] = alpha | (pix << 16) | (pix << 8) | pix
-    @ctx.putImageData @imageData, 0, 0
+    ctx.putImageData @imageData, 0, 0
 
 $ ->
   window.app = new App()
