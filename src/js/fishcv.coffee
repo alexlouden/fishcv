@@ -55,6 +55,8 @@ class App
     img_pyr = new jsfeat.pyramid_t(4)
     img_pyr.allocate 640, 480, jsfeat.U8_t | jsfeat.C1_t
 
+    @background = new jsfeat.matrix_t(640, 480, jsfeat.U8_t | jsfeat.C1_t)
+
     return
   
   tick: =>
@@ -70,9 +72,11 @@ class App
     @equalize_histogram()
     @blur_image(5)
 
-    @detect_edges()
-        
-    @render()
+    @average_background(@img_u8)
+
+    # @detect_edges()
+    
+    @render(@background)
 
   grayscale: =>
     jsfeat.imgproc.grayscale @imageData.data, @img_u8.data
@@ -85,20 +89,32 @@ class App
     sigma = 0
     jsfeat.imgproc.gaussian_blur @img_u8, @img_u8, kernel_size, sigma
 
+  average_background: (src) =>
+
+    rows = src.rows
+    cols = src.cols
+
+    f = 0.9
+
+    for i in [0 .. src.data.length]
+      @background.data[i] = (@background.data[i] * f) + (src.data[i] * (1 - f))
+
+    return
+
   detect_edges: =>
     low_threshold = 40
     high_threshold = 80
     jsfeat.imgproc.canny @img_u8, @img_u8,
       low_threshold, high_threshold
 
-  render: =>
+  render: (src) =>
     # draw data to canvas
     data_u32 = new Uint32Array(@imageData.data.buffer)
     alpha = (0xff << 24)
-    i = @img_u8.cols * @img_u8.rows
+    i = src.cols * src.rows
     pix = 0
     while --i >= 0
-      pix = @img_u8.data[i]
+      pix = src.data[i]
       data_u32[i] = alpha | (pix << 16) | (pix << 8) | pix
     @ctx.putImageData @imageData, 0, 0
 
