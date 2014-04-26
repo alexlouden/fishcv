@@ -79,13 +79,15 @@ class App
     # colour image (imagedata) to grey (img_u8)
     @grayscale()
 
-    # @equalize_histogram()
+    @equalize_histogram(@img_u8)
     @blur_image(5)
 
     if @first
       console.log 'running first'
       @background.data.set @img_u8.data
       @first = false
+
+    @equalize_histogram(@background)
 
     @average_background(@img_u8)
 
@@ -97,8 +99,8 @@ class App
   grayscale: =>
     jsfeat.imgproc.grayscale @imageData.data, @img_u8.data
 
-  equalize_histogram: =>
-    jsfeat.imgproc.equalize_histogram @img_u8.data, @img_u8.data
+  equalize_histogram: (src) =>
+    jsfeat.imgproc.equalize_histogram src.data, src.data
 
   blur_image: (blur_radius) =>
     kernel_size = (blur_radius + 1) << 1
@@ -107,33 +109,23 @@ class App
 
   average_background: (src) =>
 
-    rows = src.rows
-    cols = src.cols
-
     # how fast background averages
-    bg_f = 0.99
-
-    # how fast targets average
-    fg_f = 1
+    f = 0.96
 
     # Difference threshold
-    thresh = 0.05 * 255
+    thresh = 0.1 * 255
 
     for i in [0 .. src.data.length]
       bg_colour = @background.data[i]
       fg_colour = src.data[i]
 
-      if @difference.data[i] == 0
-        f = bg_f
-      else
-        # moving areas
-        f = fg_f
-
-      @background.data[i] = (bg_colour * f) + (fg_colour * (1 - f))
+      diff = Math.abs(bg_colour - fg_colour)
       
-      diff = Math.abs(@background.data[i] - fg_colour)
+      if @difference.data[i] == 0
+        @background.data[i] = (bg_colour * f) + (fg_colour * (1 - f))
+
       if diff > thresh
-        @difference.data[i] = 255
+        @difference.data[i] = diff / 2 + 128
       else
         @difference.data[i] = 0
 
