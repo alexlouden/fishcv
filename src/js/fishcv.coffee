@@ -56,6 +56,7 @@ class App
     img_pyr.allocate 640, 480, jsfeat.U8_t | jsfeat.C1_t
 
     @background = new jsfeat.matrix_t(640, 480, jsfeat.U8_t | jsfeat.C1_t)
+    @difference = new jsfeat.matrix_t(640, 480, jsfeat.U8_t | jsfeat.C1_t)
 
     return
   
@@ -69,14 +70,14 @@ class App
     @imageData = @ctx.getImageData(0, 0, 640, 480)
     
     @grayscale()
-    @equalize_histogram()
+    # @equalize_histogram()
     @blur_image(5)
 
     @average_background(@img_u8)
 
     # @detect_edges()
     
-    @render(@background)
+    @render(@difference)
 
   grayscale: =>
     jsfeat.imgproc.grayscale @imageData.data, @img_u8.data
@@ -94,10 +95,31 @@ class App
     rows = src.rows
     cols = src.cols
 
-    f = 0.9
+    # how fast background averages
+    bg_f = 0.7
+
+    # how fast targets average
+    fg_f = 0.95
+
+    # Difference threshold
+    thresh = 0.1 * 255
 
     for i in [0 .. src.data.length]
-      @background.data[i] = (@background.data[i] * f) + (src.data[i] * (1 - f))
+      bg_colour = @background.data[i]
+      fg_colour = src.data[i]
+
+      if @difference.data[i] <= thresh
+        f = fg_f
+      else
+        f = bg_f
+
+      @background.data[i] = (bg_colour * f) + (fg_colour * (1 - f))
+      
+      diff = Math.abs(@background.data[i] - fg_colour)
+      if diff > thresh
+        @difference.data[i] = 0
+      else
+        @difference.data[i] = diff / thresh * 255
 
     return
 
