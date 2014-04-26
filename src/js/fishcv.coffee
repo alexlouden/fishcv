@@ -80,7 +80,7 @@ class App
     @grayscale()
 
     @equalize_histogram(@img_u8)
-    @blur_image(5)
+    @blur_image(@img_u8, 5)
 
     if @first
       console.log 'running first'
@@ -90,6 +90,7 @@ class App
     @equalize_histogram(@background)
 
     @average_background(@img_u8)
+    @blur_image(@difference, 5)
 
     # @detect_edges()
     
@@ -102,10 +103,10 @@ class App
   equalize_histogram: (src) =>
     jsfeat.imgproc.equalize_histogram src.data, src.data
 
-  blur_image: (blur_radius) =>
+  blur_image: (src, blur_radius) =>
     kernel_size = (blur_radius + 1) << 1
     sigma = 0
-    jsfeat.imgproc.gaussian_blur @img_u8, @img_u8, kernel_size, sigma
+    jsfeat.imgproc.gaussian_blur src, src, kernel_size, sigma
 
   average_background: (src) =>
 
