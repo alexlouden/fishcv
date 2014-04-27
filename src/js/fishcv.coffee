@@ -171,6 +171,12 @@ class App
     @ctx.closePath()
     @ctx.fill()
 
+  draw_fish: (x, y) ->
+    @ctx.beginPath()
+    @ctx.moveTo x, y
+    @ctx.bezierCurveTo (y * 2), (x - 60),(y * 2), (y - 85), x,  y
+    @ctx.stroke()
+
   draw_boids: ->
     console.log "Boids!"
     @ctx.fillStyle = "rgb(255,0,0)"
@@ -178,7 +184,8 @@ class App
     for i in [0 .. @swarm.size - 1] by 1
       x = @swarm.boids[i << 1]
       y = @swarm.boids[(i << 1) + 1]
-      @draw_circle x, y
+      # @draw_circle x, y
+      @draw_fish x, y
 
     @ctx.fillStyle = "rgb(0,255,0)"
     @ctx.strokeStyle = "rgb(0,255,0)"
