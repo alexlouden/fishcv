@@ -122,8 +122,7 @@ class App
 
       diff = Math.abs(bg_colour - fg_colour)
       
-      if @difference.data[i] == 0
-        @background.data[i] = (bg_colour * f) + (fg_colour * (1 - f))
+      @background.data[i] = (bg_colour * f) + (fg_colour * (1 - f))
 
       if diff > thresh
         @difference.data[i] = diff / 2 + 128
