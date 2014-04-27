@@ -1,104 +1,103 @@
-class Util
-  render_mono_image: (src, dst, sw, sh, dw) ->
-    alpha = (0xff << 24)
-    i = 0
 
-    while i < sh
-      j = 0
+class Video
+  # Takes video stream and puts it in a video element
+  # When it has video it calls the ready function
+  constructor: (@ready) ->
+    @video_el = $('#webcam')[0]
 
-      while j < sw
-        pix = src[i * sw + j]
-        dst[i * dw + j] = alpha | (pix << 16) | (pix << 8) | pix
-        ++j
-      ++i
-    return
-
-
-
-class App
-  constructor: ->
-
-    @video = $('#webcam')[0]
+    # canvas and context
     @canvas = $('canvas')[0]
-    @canvas2 = $('#canvas2')[0]
+    @ctx = @canvas.getContext("2d")
+    @ctx.fillStyle = "rgb(0,255,0)"
+    @ctx.strokeStyle = "rgb(0,255,0)"
 
-    @img_u8 = new jsfeat.matrix_t(640, 480, jsfeat.U8_t | jsfeat.C1_t)
+    # @colour_frame = new jsfeat.pyramid_t(4)
+    # @colour_frame.allocate 640, 480, jsfeat.U8_t | jsfeat.C1_t
+
+    @grey_frame = new jsfeat.matrix_t(640, 480, jsfeat.U8_t | jsfeat.C1_t)
 
     compatibility.getUserMedia video: true, @handleVideo
 
   handleVideo: (stream) =>
     try
-      @video.src = compatibility.URL.createObjectURL(stream)
+      @video_el.src = compatibility.URL.createObjectURL(stream)
     catch error
-      @video.src = stream
+      @video_el.src = stream
 
-    setTimeout @step, 500
-    return
-
-  step: =>
-    @video.play()
-    @doFish()
-    compatibility.requestAnimationFrame @tick
+    setTimeout @ready, 500
     return
 
   unload: ->
-    @video.pause()
-    @video.src = null
+    @video_el.pause()
+    @video_el.src = null
     return
 
-  doFish: ->
-    canvasWidth = @canvas.width
-    canvasHeight = @canvas.height
-    @ctx = @canvas.getContext("2d")
-    @ctx.fillStyle = "rgb(0,255,0)"
-    @ctx.strokeStyle = "rgb(0,255,0)"
+  get_gray_frame: =>
+
+    if @video_el.readyState is not @video_el.HAVE_ENOUGH_DATA
+      return
+
+    # video onto canvas
+    @ctx.drawImage @video_el, 0, 0, 640, 480
+    # get canvas colour image
+    @colour_frame = @ctx.getImageData(0, 0, 640, 480)
+
+    jsfeat.imgproc.grayscale @colour_frame.data, @grey_frame.data
+
+    return @grey_frame
+
+  play: =>
+    @video_el.play()
+
+
+class App
+  constructor: ->
+    @canvas2 = $('#canvas2')[0]
+    @video = new Video(@video_ready)
+
+  video_ready: =>
+    @video.play()
+    @start_detecting_motion()
+    compatibility.requestAnimationFrame @process_frame
+    return
+
+  start_detecting_motion: ->
     
     @ctx2 = @canvas2.getContext("2d")
 
-    img_pyr = new jsfeat.pyramid_t(4)
-    img_pyr.allocate 640, 480, jsfeat.U8_t | jsfeat.C1_t
-
     @background = new jsfeat.matrix_t(640, 480, jsfeat.U8_t | jsfeat.C1_t)
     @difference = new jsfeat.matrix_t(640, 480, jsfeat.U8_t | jsfeat.C1_t)
+
+    # Used for drawing to canvas
+    @imagedata = new jsfeat.pyramid_t(4)
+    @imagedata.allocate 640, 480, jsfeat.U8_t | jsfeat.C1_t
 
     @first = true
 
     return
   
-  tick: =>
-    compatibility.requestAnimationFrame @tick
+  process_frame: =>
+    compatibility.requestAnimationFrame @process_frame
 
-    if @video.readyState is not @video.HAVE_ENOUGH_DATA
-      return
+    frame = @video.get_gray_frame()
 
-    # video onto canvas
-    @ctx.drawImage @video, 0, 0, 640, 480
-    # get canvas colour image
-    @imageData = @ctx.getImageData(0, 0, 640, 480)
-    
-    # colour image (imagedata) to grey (img_u8)
-    @grayscale()
-
-    @equalize_histogram(@img_u8)
-    @blur_image(@img_u8, 5)
+    @equalize_histogram(frame)
+    @blur_image(frame, 5)
 
     if @first
       console.log 'running first'
-      @background.data.set @img_u8.data
+      @background.data.set frame.data
       @first = false
 
     @equalize_histogram(@background)
 
-    @average_background(@img_u8)
+    @average_background(frame)
     @blur_image(@difference, 5)
 
     # @detect_edges()
     
-    @render(@ctx, @background)
+    @render(@video.ctx, @background)
     @render(@ctx2, @difference)
-
-  grayscale: =>
-    jsfeat.imgproc.grayscale @imageData.data, @img_u8.data
 
   equalize_histogram: (src) =>
     jsfeat.imgproc.equalize_histogram src.data, src.data
@@ -120,9 +119,9 @@ class App
       bg_colour = @background.data[i]
       fg_colour = src.data[i]
 
-      diff = Math.abs(bg_colour - fg_colour)
-      
       @background.data[i] = (bg_colour * f) + (fg_colour * (1 - f))
+      
+      diff = Math.abs(bg_colour - fg_colour)
 
       if diff > thresh
         @difference.data[i] = diff / 2 + 128
@@ -139,14 +138,15 @@ class App
 
   render: (ctx, src) =>
     # draw data to canvas
-    data_u32 = new Uint32Array(@imageData.data.buffer)
     alpha = (0xff << 24)
     i = src.cols * src.rows
+    frame = @video.colour_frame
+    data_u32 = new Uint32Array(frame.data.buffer)
     pix = 0
     while --i >= 0
       pix = src.data[i]
       data_u32[i] = alpha | (pix << 16) | (pix << 8) | pix
-    ctx.putImageData @imageData, 0, 0
+    ctx.putImageData frame, 0, 0
 
 $ ->
   window.app = new App()
