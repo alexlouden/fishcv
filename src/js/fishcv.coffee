@@ -176,12 +176,11 @@ class App
     @ctx.fill()
 
   draw_boids: ->
-    console.log "Boids!"
     @ctx.fillStyle = "rgb(255,0,0)"
     @ctx.strokeStyle = "rgb(255,0,0)"
     for i in [0 .. @swarm.size - 1] by 1
-      x = @swarm.boids[i << 1]
-      y = @swarm.boids[(i << 1) + 1]
+      x = @swarm.boids[i].x
+      y = @swarm.boids[i].y
       @draw_circle x, y
 
     @ctx.fillStyle = "rgb(0,255,0)"

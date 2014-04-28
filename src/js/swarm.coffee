@@ -8,123 +8,72 @@ class Swarm
 
   constructor: (size, width, height) ->
     @size = size
-    @boids = new Float32Array(size * 2 + 1)
-    @boids_velocity = new Float32Array(size * 2 + 1)
-    @focus_point = [200, 200]
+    @boids = @initialiseBoids(width, height)
+    @focus_point = new Point(0, 0)
     @width = width
     @height = height
-    @init_positions width, height
 
-  init_positions: (width, height) ->
+  initialiseBoids: (width, height) ->
+    boids = []
     for b in [0 .. @size - 1] by 1
       x = Math.random() * width
       y = Math.random() * height
-      @boids[b << 1] = Math.round(x)
-      @boids[(b << 1) + 1] = Math.round(y)
+      boids[b] = new Boid(x, y)
 
-    return
-
-  distanceBetween: (p1, p2) ->
-    n = (p1[0] - p2[0]) * (p1[0] - p2[0]) +
-      (p1[1] - p2[1]) * (p1[1] - p2[1])
-    return n
-
-  getMagnitude: (vector) ->
-    n = vector[0] * vector[0] + vector[1] * vector[1]
-    n = Math.sqrt(n)
-    return n
+    return boids
 
   setFocus: (x, y) ->
-    @focus_point[0] = x
-    @focus_point[1] = y
+    @focus_point.x = x
+    @focus_point.y = y
 
-  sweep: ->
-    @sweep_alloc = []
-    for b in [0 .. @size - 1] by 1
-      bin = Math.floor(@boids[b << 1] / @GRID_WIDTH)
-      if not @sweep_alloc[bin]?
-        @sweep_alloc[bin] = []
-      
-      @sweep_alloc[bin].push(b)
+  distanceMetric: (a, b) ->
+    return Math.pow(a.x - b.x, 2) +
+    Math.pow(a.y - b.y, 2)
 
   # Updates position and velocities of all the boids.
   update_boids: ->
-    @sweep()
-    for b in [0 .. @size - 1] by 1
-      boidPosition = [@boids[b << 1], @boids[(b << 1) + 1]]
-      bin = Math.floor(boidPosition[0] / @GRID_WIDTH)
-      boidVelocity = [@boids_velocity[b << 1], @boids_velocity[(b << 1) + 1]]
-      sumPositions = [0, 0]
-      sumVelocities = [0, 0]
-      sumDifferences = [0, 0]
+    kdtree = new kdTree(@boids, @distanceMetric, ["x", "y"])
+    for boid in @boids
+      centre = new Vector(0, 0)
 
-      for other in @sweep_alloc[bin] by 1 when other isnt b
+      neighbours = kdtree.nearest(boid, 10)
+      for n in neighbours
+        centre.add(n[0])
 
-        otherPosition = [@boids[other << 1], @boids[(other << 1) + 1]]
-        otherVelocity =
-          [@boids_velocity[other << 1], @boids_velocity[(other << 1) + 1]]
-
-        sumPositions[0] += otherPosition[0]
-        sumPositions[1] += otherPosition[1]
-
-        sumVelocities[0] += otherVelocity[0]
-        sumVelocities[1] += otherVelocity[1]
-
-        if @distanceBetween(boidPosition, otherPosition) < @REPEL_RADIUS * @REPEL_RADIUS
-          sumDifferences[0] -= (otherPosition[0] - boidPosition[0])
-          sumDifferences[1] -= (otherPosition[1] - boidPosition[1])
+      centre.scale(1/ neighbours.length)
 
       forces = []
-      # vector giving tendancy for the fish to group together
-      center = (n / (@size - 1) for n in sumPositions)
-      toCenter =
-        [(center[0] - boidPosition[0]) / @INV_CENTRE_INFLUENCE,
-        (center[1] - boidPosition[1]) / @INV_CENTRE_INFLUENCE]
-      forces.push(toCenter)
 
-      # vector for tendency for fish not to run into each other
-      forces.push(sumDifferences)
+      boid.velocity.add(
+        x: (centre.x - boid.x) / 100
+        y: (centre.y - boid.y) / 100
+      )
 
-      # fish will try to match the velocity of fish around them
-      averageVelocity = (n / (@size - 1) for n in sumVelocities)
-      averageVelocity =
-        [averageVelocity[0] - boidVelocity[0],
-        averageVelocity[1] - boidVelocity[1]]
-      match = (n / @INV_MATCH_INFLUENCE for n in averageVelocity)
-      forces.push(match)
-
-      # fish will tend towards a point
-      forces.push(@tend_to_point(b, @focus_point))
-      
-      # Sum the force vectors
-      f = [0, 0]
-      for frc in forces
-        f[0] += frc[0]
-        f[1] += frc[1]
-
-      @boids_velocity[b << 1] += f[0]
-      @boids_velocity[(b << 1) + 1] += f[1]
-      @limit_velocity(b)
-
-      # now update that position!
-      p = b << 1
-      @boids[p] += @boids_velocity[p]
-      @boids[p + 1] += @boids_velocity[p + 1]
+      # limit the velocity so they don't speed up continuously
+      @limitVelocity(boid)
+      boid.add(boid.velocity)
 
     return
 
   # limits the velocity so that the boids can't go arbitrarily fast.
-  limit_velocity: (boid) ->
-    v = [@boids_velocity[boid << 1], @boids_velocity[(boid << 1) + 1]]
-    mag = @getMagnitude(v)
+  limitVelocity: (boid) ->
+    mag = boid.velocity.magnitude()
     if mag > @V_LIM
-      @boids_velocity[boid << 1] = @boids_velocity[boid << 1] /  mag * @V_LIM
-      @boids_velocity[(boid << 1) + 1] =
-        @boids_velocity[(boid << 1) + 1] / mag * @V_LIM
+      boid.velocity.scale(@V_LIM / mag)
+
+  calculateAverages: (list) ->
+    vectors = [
+      new Vector(0, 0),
+      new Vector(0, 0)
+    ]
+    for v in list
+      vectors[0].add(v[0])
+      vectors[1].add(v[0].velocity)
+
+    return vectors
 
   tend_to_point: (boid,  point) ->
-    b = [@boids[boid << 1], @boids[(boid << 1) + 1]]
     r = []
-    r[0] = (point[0] - b[0]) / @INV_TEND_TO_INFLUENCE
-    r[1] = (point[1] - b[1]) / @INV_TEND_TO_INFLUENCE
-    return r
+    r[0] = (point.x - boid.x) / @INV_TEND_TO_INFLUENCE
+    r[1] = (point.y - boid.y) / @INV_TEND_TO_INFLUENCE
+    return new Vector(r[0], r[1])
