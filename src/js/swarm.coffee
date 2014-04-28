@@ -1,5 +1,5 @@
 class Swarm
-  REPEL_RADIUS: 40
+  SQ_REPEL_RADIUS: 20 * 20
   V_LIM: 5
   INV_CENTRE_INFLUENCE: 100
   INV_MATCH_INFLUENCE: 8
@@ -35,18 +35,38 @@ class Swarm
     kdtree = new kdTree(@boids, @distanceMetric, ["x", "y"])
     for boid in @boids
       centre = new Vector(0, 0)
+      repel = new Vector(0, 0)
+      avVelocities = new Vector(0, 0)
 
       neighbours = kdtree.nearest(boid, 10)
       for n in neighbours
+        # calculating the centre of the boids neighbours.
         centre.add(n[0])
 
+        # add the vector between nearby neighbours.
+        if boid.squaredDistanceTo(n[0]) < @SQ_REPEL_RADIUS
+          repel.add(
+            x: boid.x - n[0].x
+            y: boid.y - n[0].y
+          )
+
+        # will be averaging the velocities of the neibour boids
+        avVelocities.add(n[0].velocity)
+
       centre.scale(1/ neighbours.length)
+      avVelocities.scale(1 / neighbours.length)
 
       forces = []
 
+      # sum the forces on the boid
       boid.velocity.add(
         x: (centre.x - boid.x) / 100
         y: (centre.y - boid.y) / 100
+      )
+      boid.velocity.add(repel)
+      boid.velocity.add(
+        x: (avVelocities.x - n[0].velocity.x) / 8
+        y: (avVelocities.y - n[0].velocity.y) / 8
       )
 
       # limit the velocity so they don't speed up continuously
