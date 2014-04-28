@@ -3,8 +3,9 @@ class Swarm
   V_LIM: 5
   INV_CENTRE_INFLUENCE: 100
   INV_MATCH_INFLUENCE: 8
-  INV_TEND_TO_INFLUENCE: 10
+  INV_TEND_TO_INFLUENCE: 100
   GRID_WIDTH: 20
+  SQ_NEIGHBOUR_SEARCH_DIST: 20 * 20
 
   constructor: (size, width, height) ->
     @size = size
@@ -38,7 +39,7 @@ class Swarm
       repel = new Vector(0, 0)
       avVelocities = new Vector(0, 0)
 
-      neighbours = kdtree.nearest(boid, 10)
+      neighbours = kdtree.nearest(boid, 100, @SQ_NEIGHBOUR_SEARCH_DIST)
       for n in neighbours
         # calculating the centre of the boids neighbours.
         centre.add(n[0])
@@ -60,14 +61,15 @@ class Swarm
 
       # sum the forces on the boid
       boid.velocity.add(
-        x: (centre.x - boid.x) / 100
-        y: (centre.y - boid.y) / 100
+        x: (centre.x - boid.x) / @INV_CENTRE_INFLUENCE
+        y: (centre.y - boid.y) / @INV_CENTRE_INFLUENCE
       )
       boid.velocity.add(repel)
       boid.velocity.add(
-        x: (avVelocities.x - n[0].velocity.x) / 8
-        y: (avVelocities.y - n[0].velocity.y) / 8
+        x: (avVelocities.x - n[0].velocity.x) / @INV_MATCH_INFLUENCE
+        y: (avVelocities.y - n[0].velocity.y) / @INV_MATCH_INFLUENCE
       )
+      boid.velocity.add(@tendToFocus(boid))
 
       # limit the velocity so they don't speed up continuously
       @limitVelocity(boid)
@@ -92,8 +94,8 @@ class Swarm
 
     return vectors
 
-  tend_to_point: (boid,  point) ->
-    r = []
-    r[0] = (point.x - boid.x) / @INV_TEND_TO_INFLUENCE
-    r[1] = (point.y - boid.y) / @INV_TEND_TO_INFLUENCE
-    return new Vector(r[0], r[1])
+  tendToFocus: (boid) ->
+    vector =
+      x: (@focus_point.x - boid.x) / @INV_TEND_TO_INFLUENCE
+      y: (@focus_point.y - boid.y) / @INV_TEND_TO_INFLUENCE
+    return vector
