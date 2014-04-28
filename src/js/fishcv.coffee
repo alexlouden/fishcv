@@ -56,13 +56,10 @@ class App
     @video = new Video(@video_ready)
 
   video_ready: =>
-    @video.play()
-    @start_detecting_motion()
-    compatibility.requestAnimationFrame @process_frame
-    return
 
-  start_detecting_motion: ->
+    @video.play()
     
+    # Prepare canvas and image frames
     @ctx2 = @canvas2.getContext("2d")
 
     @background = new jsfeat.matrix_t(640, 480, jsfeat.U8_t | jsfeat.C1_t)
@@ -72,8 +69,11 @@ class App
     @imagedata = new jsfeat.pyramid_t(4)
     @imagedata.allocate 640, 480, jsfeat.U8_t | jsfeat.C1_t
 
+    # First loop
     @first = true
 
+    # Start processing
+    compatibility.requestAnimationFrame @process_frame
     return
   
   process_frame: =>
