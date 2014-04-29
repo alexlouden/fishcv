@@ -110,7 +110,7 @@ class App
   average_background: (src) =>
 
     # how fast background averages
-    f = 0.96
+    f = 0.99
 
     # Difference threshold
     thresh = 0.1 * 255
@@ -119,7 +119,8 @@ class App
       bg_colour = @background.data[i]
       fg_colour = src.data[i]
 
-      @background.data[i] = (bg_colour * f) + (fg_colour * (1 - f))
+      if @difference.data[i] == 0
+        @background.data[i] = (bg_colour * f) + (fg_colour * (1 - f))
       
       diff = Math.abs(bg_colour - fg_colour)
 
