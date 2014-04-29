@@ -39,7 +39,7 @@ class Swarm
       repel = new Vector(0, 0)
       avVelocities = new Vector(0, 0)
 
-      neighbours = kdtree.nearest(boid, 100, @SQ_NEIGHBOUR_SEARCH_DIST)
+      neighbours = kdtree.nearest(boid, 2)
       for n in neighbours
         # calculating the centre of the boids neighbours.
         centre.add(n[0])
