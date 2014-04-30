@@ -27,8 +27,30 @@ class App
 
     @imageData = new jsfeat.matrix_t(640, 480, jsfeat.U8_t | jsfeat.C1_t)
     @swarm = new Swarm(50, @canvas.width, @canvas.height)
+    @bindControls()
 
     compatibility.getUserMedia video: true, @handleVideo
+
+  bindControls: ->
+    $('#grouping').change((e) =>
+      val = $('#grouping').val()
+      @swarm.CENTRE_INFLUENCE = 1 / (10001 - val)
+    )
+
+    $('#match').change((e) =>
+      val = $('#match').val()
+      @swarm.CENTRE_INFLUENCE = 1 / (10001 - val)
+    )
+
+    $('#tend_to').change((e) =>
+      val = $('#tend_to').val()
+      @swarm.CENTRE_INFLUENCE = 1 / (10001 - val)
+    )
+
+    $('#repel').change((e) =>
+      val = $('#repel').val()
+      @swarm.CENTRE_INFLUENCE = 1 / (10001 - val)
+    )
 
   handleVideo: (stream) =>
     try

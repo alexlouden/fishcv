@@ -8,6 +8,12 @@
 <body>
     <video id="webcam"></video>
     <canvas height="480px" width="600px"></canvas>
+    <div class="controls">
+		Grouping: <input id="grouping" type="range" min="1" max="10000" /><br />
+		Match Nearby Velocity: <input id="match" type="range" min="1" max="10000" /><br />
+		Tend to Point: <input type="range" id="tend_to" min="1" max="10000" /><br />
+		Repel: <input type="range" id="repel" min="1" max="10000" />
+    </div>
 	<script type="text/javascript" src="js/jquery.min.js"></script>
 	<script type="text/javascript" src="js/jsfeat-min.js"></script>
 	<script type="text/javascript" src="js/kdTree-min.js"></script>
