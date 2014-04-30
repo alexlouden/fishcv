@@ -2,12 +2,14 @@ class Swarm
   SQ_REPEL_RADIUS: 20 * 20
   V_LIM: 5
   CENTRE_INFLUENCE: 1 / 1000
-  MATCH_INFLUENCE: 1 / 80
-  TEND_TO_INFLUENCE: 1 / 1000
+  MATCH_INFLUENCE: 1 / 40
+  TEND_TO_INFLUENCE: 1 / 100000
   REPEL_INFLUENCE: 1 / 100
   GRID_WIDTH: 20
-  SQ_NEIGHBOUR_SEARCH_DIST: 20 * 20
+  SQ_NEIGHBOUR_SEARCH_DIST: 30 * 30
+  MAX_NEIGHBOURS: 30
   WRAP_RADIUS: 40
+  EDGE_FORCE: 0.25
 
   constructor: (size, width, height) ->
     @size = size
@@ -22,9 +24,6 @@ class Swarm
       x = Math.random() * width
       y = Math.random() * height
       boids[b] = new Boid(x, y)
-      vel = @makeRandomVector()
-      #boids[b].velocity.x = vel.x
-      #Mboids[b].velocity.y = vel.y
 
     return boids
 
@@ -44,7 +43,7 @@ class Swarm
       repel = new Vector(0, 0)
       avVelocities = new Vector(0, 0)
 
-      neighbours = kdtree.nearest(boid, 2)
+      neighbours = kdtree.nearest(boid, @MAX_NEIGHBOURS, @SQ_NEIGHBOUR_SEARCH_DIST)
       for n in neighbours
         # calculating the centre of the boids neighbours.
         centre.add(n[0])
@@ -77,17 +76,17 @@ class Swarm
 
       # boids will tend to match the velocity of nearby boids
       boid.velocity.add(
-        x: (avVelocities.x - n[0].velocity.x) * @MATCH_INFLUENCE
-        y: (avVelocities.y - n[0].velocity.y) * @MATCH_INFLUENCE
+        x: (avVelocities.x - boid.velocity.x) * @MATCH_INFLUENCE
+        y: (avVelocities.y - boid.velocity.y) * @MATCH_INFLUENCE
       )
 
       # boids will tend towards a location
       boid.velocity.add(@tendToFocus(boid))
 
       # limit the velocity so they don't speed up continuously
-      @limitVelocity(boid)
       boid.add(boid.velocity)
       @wrapPosition(boid)
+      @limitVelocity(boid)
 
     return
 
@@ -115,17 +114,17 @@ class Swarm
     return vector
 
   wrapPosition: (boid) ->
-    if boid.x > @width + @WRAP_RADIUS
-      boid.x = -@WRAP_RADIUS
+    if boid.x > @width - @WRAP_RADIUS
+      boid.velocity.x -= @EDGE_FORCE
 
-    if boid.y > @height + @WRAP_RADIUS
-      boid.y = -@WRAP_RADIUS
+    if boid.y > @height - @WRAP_RADIUS
+      boid.velocity.y -= @EDGE_FORCE
 
-    if boid.x < -@WRAP_RADIUS
-      boid.x = @width + @WRAP_RADIUS
+    if boid.x < @WRAP_RADIUS
+      boid.velocity.x += @EDGE_FORCE
 
-    if boid.y < -@WRAP_RADIUS
-      boid.y = @height + @WRAP_RADIUS
+    if boid.y < @WRAP_RADIUS
+      boid.velocity.y += @EDGE_FORCE
 
   makeRandomVector: ->
     x = Math.floor(Math.random() * 10)
