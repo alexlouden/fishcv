@@ -1,11 +1,13 @@
 class Swarm
   SQ_REPEL_RADIUS: 20 * 20
   V_LIM: 5
-  INV_CENTRE_INFLUENCE: 100
-  INV_MATCH_INFLUENCE: 8
-  INV_TEND_TO_INFLUENCE: 100
+  CENTRE_INFLUENCE: 1 / 1000
+  MATCH_INFLUENCE: 1 / 80
+  TEND_TO_INFLUENCE: 1 / 1000
+  REPEL_INFLUENCE: 1 / 100
   GRID_WIDTH: 20
   SQ_NEIGHBOUR_SEARCH_DIST: 20 * 20
+  WRAP_RADIUS: 40
 
   constructor: (size, width, height) ->
     @size = size
@@ -20,6 +22,9 @@ class Swarm
       x = Math.random() * width
       y = Math.random() * height
       boids[b] = new Boid(x, y)
+      vel = @makeRandomVector()
+      #boids[b].velocity.x = vel.x
+      #Mboids[b].velocity.y = vel.y
 
     return boids
 
@@ -60,20 +65,29 @@ class Swarm
       forces = []
 
       # sum the forces on the boid
+      #force of boids tending to 'clump' together
       boid.velocity.add(
-        x: (centre.x - boid.x) / @INV_CENTRE_INFLUENCE
-        y: (centre.y - boid.y) / @INV_CENTRE_INFLUENCE
+        x: (centre.x - boid.x) * @CENTRE_INFLUENCE
+        y: (centre.y - boid.y) * @CENTRE_INFLUENCE
       )
+
+      # boids don't want to run into each other
+      repel.scale(@REPEL_INFLUENCE)
       boid.velocity.add(repel)
+
+      # boids will tend to match the velocity of nearby boids
       boid.velocity.add(
-        x: (avVelocities.x - n[0].velocity.x) / @INV_MATCH_INFLUENCE
-        y: (avVelocities.y - n[0].velocity.y) / @INV_MATCH_INFLUENCE
+        x: (avVelocities.x - n[0].velocity.x) * @MATCH_INFLUENCE
+        y: (avVelocities.y - n[0].velocity.y) * @MATCH_INFLUENCE
       )
+
+      # boids will tend towards a location
       boid.velocity.add(@tendToFocus(boid))
 
       # limit the velocity so they don't speed up continuously
       @limitVelocity(boid)
       boid.add(boid.velocity)
+      @wrapPosition(boid)
 
     return
 
@@ -96,6 +110,26 @@ class Swarm
 
   tendToFocus: (boid) ->
     vector =
-      x: (@focus_point.x - boid.x) / @INV_TEND_TO_INFLUENCE
-      y: (@focus_point.y - boid.y) / @INV_TEND_TO_INFLUENCE
+      x: (@focus_point.x - boid.x) * @TEND_TO_INFLUENCE
+      y: (@focus_point.y - boid.y) * @TEND_TO_INFLUENCE
     return vector
+
+  wrapPosition: (boid) ->
+    if boid.x > @width + @WRAP_RADIUS
+      boid.x = -@WRAP_RADIUS
+
+    if boid.y > @height + @WRAP_RADIUS
+      boid.y = -@WRAP_RADIUS
+
+    if boid.x < -@WRAP_RADIUS
+      boid.x = @width + @WRAP_RADIUS
+
+    if boid.y < -@WRAP_RADIUS
+      boid.y = @height + @WRAP_RADIUS
+
+  makeRandomVector: ->
+    x = Math.floor(Math.random() * 10)
+    y = Math.floor(Math.random() * 10)
+    v = new Vector(x, y)
+    v.scale(@V_LIM / v.magnitude())
+    return v
