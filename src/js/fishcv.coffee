@@ -54,17 +54,15 @@ class App
     @ctx.fillStyle = "rgb(0,255,0)"
     @ctx.strokeStyle = "rgb(0,255,0)"
 
-    @draw_fish 200, 200
+    @draw_fish 200, 200, 0
 
-  draw_fish: (x, y) ->
-
-    direction = 0
+  draw_fish: (x, y, direction) ->
 
     width = 40
     height = 200
 
-    tail_offset = 0.07
-    tail_width = 0.7
+    tail_offset = 0.07 # Ratio of height
+    tail_width = 0.7 # Ratio of width
 
     tail_1_x = x + width * tail_width
     tail_1_y = y + height * (1 + tail_offset)
@@ -84,8 +82,8 @@ class App
 
     cp1_x = x + width
     cp1_y = y
-    cp2_x = x + width/2  * 1.4
-    cp2_y = y + height/2 * 1.1
+    cp2_x = x + width/2  * 1.4 # Magic numbers to make
+    cp2_y = y + height/2 * 1.1 # fish body more even
 
     @ctx.bezierCurveTo cp1_x, cp1_y, cp2_x, cp2_y, tail_2_x, tail_2_y
 
