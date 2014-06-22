@@ -1,224 +1,153 @@
-class Util
-  render_mono_image: (src, dst, sw, sh, dw) ->
-    alpha = (0xff << 24)
-    i = 0
 
-    while i < sh
-      j = 0
+class Video
+  # Takes video stream and puts it in a video element
+  # When it has video it calls the ready function
+  constructor: (@ready) ->
+    @video_el = $('#webcam')[0]
 
-      while j < sw
-        pix = src[i * sw + j]
-        dst[i * dw + j] = alpha | (pix << 16) | (pix << 8) | pix
-        ++j
-      ++i
-    return
-
-
-
-class App
-  constructor: ->
-
-    @video = $('#webcam')[0]
+    # canvas and context
     @canvas = $('canvas')[0]
-
-    @canvas.addEventListener('click', (e) =>
-      @swarm.setFocus(e.offsetX, e.offsetY)
-    )
-
-    @imageData = new jsfeat.matrix_t(640, 480, jsfeat.U8_t | jsfeat.C1_t)
-    @swarm = new Swarm(50, @canvas.width, @canvas.height)
-    @bindControls()
-
-    compatibility.getUserMedia video: true, @handleVideo, -> console.log 'Error!'
-
-  bindControls: ->
-    $('#grouping').change((e) =>
-      val = $('#grouping').val()
-      @swarm.CENTRE_INFLUENCE = 1 / (10001 - val)
-    )
-
-    $('#match').change((e) =>
-      val = $('#match').val()
-      @swarm.CENTRE_INFLUENCE = 1 / (10001 - val)
-    )
-
-    $('#tend_to').change((e) =>
-      val = $('#tend_to').val()
-      @swarm.CENTRE_INFLUENCE = 1 / (10001 - val)
-    )
-
-    $('#repel').change((e) =>
-      val = $('#repel').val()
-      @swarm.CENTRE_INFLUENCE = 1 / (10001 - val)
-    )
-
-  handleVideo: (stream) =>
-    try
-      @video.src = compatibility.URL.createObjectURL(stream)
-    catch error
-      @video.src = stream
-
-    setTimeout @step, 500
-    return
-
-  step: =>
-    @video.play()
-    @doFish()
-    compatibility.requestAnimationFrame @tick
-    return
-
-  unload: ->
-    @video.pause()
-    @video.src = null
-    return
-
-  doFish: ->
-
     @ctx = @canvas.getContext("2d")
     @ctx.fillStyle = "rgb(0,255,0)"
     @ctx.strokeStyle = "rgb(0,255,0)"
 
-    @curr_img_pyr = new jsfeat.pyramid_t(3)
-    @prev_img_pyr = new jsfeat.pyramid_t(3)
-    @curr_img_pyr.allocate 640, 480, jsfeat.U8_t | jsfeat.C1_t
-    @prev_img_pyr.allocate 640, 480, jsfeat.U8_t | jsfeat.C1_t
+    # @colour_frame = new jsfeat.pyramid_t(4)
+    # @colour_frame.allocate 640, 480, jsfeat.U8_t | jsfeat.C1_t
 
-    @point_count = 0
-    @point_status = new Uint8Array(100)
-    @prev_xy = new Float32Array(100 * 2)
-    @curr_xy = new Float32Array(100 * 2)
+    @grey_frame = new jsfeat.matrix_t(640, 480, jsfeat.U8_t | jsfeat.C1_t)
 
-    @options =
-      win_size: 20
-      max_iterations: 30
-      epsilon: 0.01
-      min_eigen: 0.001
+    compatibility.getUserMedia video: true, @handleVideo, -> console.log 'error!'
 
+  handleVideo: (stream) =>
+    try
+      @video_el.src = compatibility.URL.createObjectURL(stream)
+    catch error
+      @video_el.src = stream
+
+    setTimeout @ready, 500
+    return
+
+  unload: ->
+    @video_el.pause()
+    @video_el.src = null
+    return
+
+  get_gray_frame: =>
+
+    if @video_el.readyState is not @video_el.HAVE_ENOUGH_DATA
+      return
+
+    # video onto canvas
+    @ctx.drawImage @video_el, 0, 0, 640, 480
+    # get canvas colour image
+    @colour_frame = @ctx.getImageData(0, 0, 640, 480)
+
+    jsfeat.imgproc.grayscale @colour_frame.data, @grey_frame.data
+
+    return @grey_frame
+
+  play: =>
+    @video_el.play()
+
+
+class App
+  constructor: ->
+    @canvas2 = $('#canvas2')[0]
+    @video = new Video(@video_ready)
+
+  video_ready: =>
+
+    @video.play()
+    
+    # Prepare canvas and image frames
+    @ctx2 = @canvas2.getContext("2d")
+
+    @background = new jsfeat.matrix_t(640, 480, jsfeat.U8_t | jsfeat.C1_t)
+    @difference = new jsfeat.matrix_t(640, 480, jsfeat.U8_t | jsfeat.C1_t)
+
+    # Used for drawing to canvas
+    @imagedata = new jsfeat.pyramid_t(4)
+    @imagedata.allocate 640, 480, jsfeat.U8_t | jsfeat.C1_t
+
+    # First loop
+    @first = true
+
+    # Start processing
+    compatibility.requestAnimationFrame @process_frame
     return
   
-  tick: =>
-    compatibility.requestAnimationFrame @tick
+  process_frame: =>
+    compatibility.requestAnimationFrame @process_frame
 
-    if @video.readyState is not @video.HAVE_ENOUGH_DATA
-      return
+    frame = @video.get_gray_frame()
 
-    @ctx.drawImage @video, 0, 0, 640, 480
-    @imageData = @ctx.getImageData(0, 0, 640, 480)
-    
-    # @blur_image(5)
+    @equalize_histogram(frame)
+    @blur_image(frame, 5)
+
+    if @first
+      console.log 'running first'
+      @background.data.set frame.data
+      @first = false
+
+    @equalize_histogram(@background)
+
+    @average_background(frame)
+    @blur_image(@difference, 5)
+
     # @detect_edges()
+    
+    @render(@video.ctx, @background)
+    @render(@ctx2, @difference)
 
-    # swap flow data
-    [@prev_xy, @curr_xy] = [@curr_xy, @prev_xy]
-    [@prev_img_pyr, @curr_img_pyr] = [@curr_img_pyr, @prev_img_pyr]
+  equalize_histogram: (src) =>
+    jsfeat.imgproc.equalize_histogram src.data, src.data
 
-    @grayscale()
-    @equalize_histogram()
+  blur_image: (src, blur_radius) =>
+    kernel_size = (blur_radius + 1) << 1
+    sigma = 0
+    jsfeat.imgproc.gaussian_blur src, src, kernel_size, sigma
 
-    @draw_boids()
-    @swarm.update_boids()
+  average_background: (src) =>
 
-    # @render()
-    @optical_flow()
+    # how fast background averages
+    f = 0.99
 
-  grayscale: ->
-    jsfeat.imgproc.grayscale @imageData.data, @curr_img_pyr.data[0].data
+    # Difference threshold
+    thresh = 0.1 * 255
 
-  equalize_histogram: ->
-    jsfeat.imgproc.equalize_histogram(
-      @curr_img_pyr.data[0].data, @curr_img_pyr.data[0].data
-    )
+    for i in [0 .. src.data.length]
+      bg_colour = @background.data[i]
+      fg_colour = src.data[i]
 
-  add_tracking_points: =>
+      if @difference.data[i] == 0
+        @background.data[i] = (bg_colour * f) + (fg_colour * (1 - f))
+      
+      diff = Math.abs(bg_colour - fg_colour)
 
-    if @point_count > 50
-      return
-
-    canvasWidth = @canvas.width
-    canvasHeight = @canvas.height
-    for x in [0..10]
-      for y in [0..10]
-        @add_tracking_point(canvasWidth/10*x, canvasWidth/10*y)
+      if diff > thresh
+        @difference.data[i] = diff / 2 + 128
+      else
+        @difference.data[i] = 0
 
     return
 
-  add_tracking_point: (x, y) ->
+  detect_edges: =>
+    low_threshold = 40
+    high_threshold = 80
+    jsfeat.imgproc.canny @img_u8, @img_u8,
+      low_threshold, high_threshold
 
-    @curr_xy[@point_count<<1] = x
-    @curr_xy[(@point_count<<1)+1] = y
-
-    @point_count++
-
-  optical_flow: ->
-    @curr_img_pyr.build @curr_img_pyr.data[0], true
-
-    jsfeat.optical_flow_lk.track(
-      @prev_img_pyr, @curr_img_pyr,
-      @prev_xy, @curr_xy,
-      @point_count,
-      @options.win_size, @options.max_iterations,
-      @point_status, @options.epsilon, @options.min_eigen
-    )
-
-    @prune_oflow_points()
-    @add_tracking_points()
-
-  # blur_image: (blur_radius) =>
-  #   kernel_size = (blur_radius + 1) << 1
-  #   sigma = 0
-  #   jsfeat.imgproc.gaussian_blur @curr_img_pyr, @curr_img_pyr,
-  # kernel_size, sigma
-
-  # detect_edges: =>
-  #   low_threshold = 40
-  #   high_threshold = 80
-  #   jsfeat.imgproc.canny @imageData, @imageData,
-  #     low_threshold, high_threshold
-
-  prune_oflow_points: ->
-    # ugh
-    n = @point_count
-    i = 0
-    j = 0
-    while i < n
-      if @point_status[i] is 1
-        if j < i
-          @curr_xy[j << 1] = @curr_xy[i << 1]
-          @curr_xy[(j << 1) + 1] = @curr_xy[(i << 1) + 1]
-        @draw_circle @curr_xy[j << 1], @curr_xy[(j << 1) + 1]
-        ++j
-      ++i
-    @point_count = j
-    return
-
-  draw_circle: (x, y) ->
-    @ctx.beginPath()
-    @ctx.arc x, y, 4, 0, Math.PI * 2, true
-    @ctx.closePath()
-    @ctx.fill()
-
-  draw_boids: ->
-    @ctx.fillStyle = "rgb(255,0,0)"
-    @ctx.strokeStyle = "rgb(255,0,0)"
-    for i in [0 .. @swarm.size - 1] by 1
-      x = @swarm.boids[i].x
-      y = @swarm.boids[i].y
-      @draw_circle x, y
-
-    @ctx.fillStyle = "rgb(0,255,0)"
-    @ctx.strokeStyle = "rgb(0,255,0)"
-    return
-
-  # render: =>
-  #   # draw data to canvas
-  #   data_u32 = new Uint32Array(@imageData.data.buffer)
-  #   alpha = (0xff << 24)
-  #   i = @curr_img_pyr.cols * @curr_img_pyr.rows
-  #   pix = 0
-  #   while --i >= 0
-  #     pix = @curr_img_pyr.data[i]
-  #     data_u32[i] = alpha | (pix << 16) | (pix << 8) | pix
-  #   @ctx.putImageData @imageData, 0, 0
+  render: (ctx, src) =>
+    # draw data to canvas
+    alpha = (0xff << 24)
+    i = src.cols * src.rows
+    frame = @video.colour_frame
+    data_u32 = new Uint32Array(frame.data.buffer)
+    pix = 0
+    while --i >= 0
+      pix = src.data[i]
+      data_u32[i] = alpha | (pix << 16) | (pix << 8) | pix
+    ctx.putImageData frame, 0, 0
 
 $ ->
   window.app = new App()

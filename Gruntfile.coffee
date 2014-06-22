@@ -20,7 +20,7 @@ module.exports = (grunt) ->
           'dist/js/fishcv.js': 'src/**/*.coffee'
       
         options:
-          sourceMap: false
+          sourceMap: true
           join: true
           bare: true
           
