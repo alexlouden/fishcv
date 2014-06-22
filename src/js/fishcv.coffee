@@ -29,7 +29,7 @@ class App
     @swarm = new Swarm(50, @canvas.width, @canvas.height)
     @bindControls()
 
-    compatibility.getUserMedia video: true, @handleVideo
+    compatibility.getUserMedia video: true, @handleVideo, -> console.log 'Error!'
 
   bindControls: ->
     $('#grouping').change((e) =>
